@@ -1,0 +1,12 @@
+# Sensitive Configuration
+.env
+
+# System Files
+.DS_Store
+._*
+
+# Temporary Restore Directories (from restore.sh)
+*_restore_*
+
+# Logs (if any are saved locally)
+*.log
