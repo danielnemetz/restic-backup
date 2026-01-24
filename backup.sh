@@ -17,6 +17,16 @@ else
     exit 1
 fi
 
+# 4. Locking (Prevent concurrent backups)
+# Uses a lockfile at /var/tmp or falls back to /tmp
+LOCK_FILE="/var/tmp/restic-backup.lock"
+if [ ! -d "/var/tmp" ]; then
+    LOCK_FILE="/tmp/restic-backup.lock"
+fi
+
+exec 200>"$LOCK_FILE"
+flock -n 200 || { log "Backup already running (locked by $LOCK_FILE). Aborting."; exit 1; }
+
 # Define Hooks Directory
 HOOKS_DIR="${SCRIPT_DIR}/hooks"
 
