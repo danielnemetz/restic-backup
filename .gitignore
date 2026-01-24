@@ -8,5 +8,11 @@
 # Temporary Restore Directories (from restore.sh)
 *_restore_*
 
+# Hooks (Ignore custom scripts, but keep examples)
+hooks/pre-backup.d/*
+!hooks/pre-backup.d/00-example.sh
+hooks/post-backup.d/*
+!hooks/post-backup.d/00-example.sh
+
 # Logs (if any are saved locally)
 *.log
