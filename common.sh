@@ -34,3 +34,35 @@ export RCLONE_CONFIG
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
+
+# 5. Dependency Check
+check_dependencies() {
+    local missing=0
+    for cmd in restic rclone flock; do
+        if ! command -v "$cmd" &> /dev/null; then
+            echo "Error: Required command '$cmd' not found." >&2
+            missing=1
+        fi
+    done
+
+    if [ $missing -eq 1 ]; then
+        echo "Please install missing dependencies." >&2
+        exit 1
+    fi
+}
+
+# 6. Monitoring (Healthchecks.io / Uptime Kuma)
+monitor_ping() {
+    local status="$1" # start, success, fail
+    if [ -n "${HEALTHCHECK_URL:-}" ]; then
+        # If url ends with /, remove it
+        local url="${HEALTHCHECK_URL%/}"
+        
+        # Check if curl exists (dependency check should catch this but let's be safe)
+        if command -v curl &> /dev/null; then
+             log "Result: Sending monitoring ping ($status)..."
+             # Use a timeout so we don't hang forever on a ping
+             curl -fsS -m 10 --retry 3 "${url}/${status}" > /dev/null || log "Warning: Monitoring ping failed."
+        fi
+    fi
+}
