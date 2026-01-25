@@ -32,10 +32,38 @@ export RCLONE_CONFIG
 
 # 4. Logging Helper
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+    echo "$msg"
+    # Append to log file if variable is set and file is writable (or creatable)
+    if [ -n "${LOG_FILE:-}" ]; then
+        echo "$msg" >> "$LOG_FILE" 2>/dev/null || true
+    fi
 }
 
-# 5. Dependency Check
+# 5. Permission Check
+check_permissions() {
+    # Check if .env is too open (Group/Other read/write/exec)
+    # Using stat to get octal permissions.
+    # macOS/BSD 'stat -f %A' vs GNU 'stat -c %a'
+    local perms
+    if stat -f %A "$ENV_FILE" > /dev/null 2>&1; then
+        # macOS / BSD
+        perms=$(stat -f %Lp "$ENV_FILE")
+    else
+        # GNU / Linux
+        perms=$(stat -c %a "$ENV_FILE")
+    fi
+
+    # Check if last two digits are "00" (e.g., 600, 400).
+    # If not 00, it means group or others have some access.
+    if [[ "$perms" != *00 ]]; then
+        log "WARNING: Insecure permissions ($perms) on $ENV_FILE. Should be 600."
+        log "Fix with: chmod 600 $ENV_FILE"
+        # We don't exit here, just warn.
+    fi
+}
+
+# 6. Dependency Check
 check_dependencies() {
     local missing=0
     for cmd in restic rclone flock; do

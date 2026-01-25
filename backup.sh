@@ -21,6 +21,23 @@ fi
 # Check Dependencies
 check_dependencies
 
+# Check Permissions
+check_permissions
+
+# Configure File Logging
+# Try /var/log, fall back to /tmp/restic-backup.log if not writable
+LOG_FILE="/var/log/restic-backup.log"
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    LOG_FILE="/tmp/restic-backup.log"
+    if ! touch "$LOG_FILE" 2>/dev/null; then
+        echo "Warning: Cannot write to log files /var/log or /tmp. File logging disabled." >&2
+        LOG_FILE=""
+    fi
+fi
+if [ -n "$LOG_FILE" ]; then
+    log "Logging to: $LOG_FILE"
+fi
+
 # Parse Arguments
 DRY_RUN=false
 for arg in "$@"; do
@@ -39,9 +56,6 @@ if [ ! -d "/var/tmp" ]; then
     LOCK_FILE="/tmp/restic-backup.lock"
 fi
 
-# In Dry-Run, we might skip locking or just log it. Let's keep locking to simulate real run behavior,
-# BUT if it's a dry-run we might want to allow it even if a real backup is running?
-# Better safe: Enforce locking even in dry-run to test locking logic too.
 exec 200>"$LOCK_FILE"
 flock -n 200 || { log "Backup already running (locked by $LOCK_FILE). Aborting."; monitor_ping "fail"; exit 1; }
 
