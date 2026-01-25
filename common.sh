@@ -66,7 +66,7 @@ check_permissions() {
 # 6. Dependency Check
 check_dependencies() {
     local missing=0
-    for cmd in restic rclone flock; do
+    for cmd in restic rclone flock jq; do
         if ! command -v "$cmd" &> /dev/null; then
             echo "Error: Required command '$cmd' not found." >&2
             missing=1
@@ -82,6 +82,8 @@ check_dependencies() {
 # 6. Monitoring (Healthchecks.io / Uptime Kuma)
 monitor_ping() {
     local status="$1" # start, success, fail
+    local payload="${2:-}" # Optional JSON payload
+
     if [ -n "${HEALTHCHECK_URL:-}" ]; then
         # If url ends with /, remove it
         local url="${HEALTHCHECK_URL%/}"
@@ -89,8 +91,14 @@ monitor_ping() {
         # Check if curl exists (dependency check should catch this but let's be safe)
         if command -v curl &> /dev/null; then
              log "Result: Sending monitoring ping ($status)..."
-             # Use a timeout so we don't hang forever on a ping
-             curl -fsS -m 10 --retry 3 "${url}/${status}" > /dev/null || log "Warning: Monitoring ping failed."
+             
+             if [ -n "$payload" ] && [ "$status" != "start" ]; then
+                 # Send with payload (POST)
+                 curl -fsS -m 10 --retry 3 --data-raw "$payload" "${url}/${status}" > /dev/null || log "Warning: Monitoring ping failed."
+             else
+                 # Send without payload (GET/POST)
+                 curl -fsS -m 10 --retry 3 "${url}/${status}" > /dev/null || log "Warning: Monitoring ping failed."
+             fi
         fi
     fi
 }

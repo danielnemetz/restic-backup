@@ -116,6 +116,10 @@ fi
 set +e
 
 BACKUP_HAS_ERRORS=false
+TOTAL_FILES_NEW=0
+TOTAL_FILES_CHANGED=0
+TOTAL_BYTES=0
+TOTAL_DURATION=0
 
 for target in $BACKUP_TARGETS; do
     # Split "PATH:TAG" into variables
@@ -125,20 +129,56 @@ for target in $BACKUP_TARGETS; do
     log ">>> Starting backup for: $SOURCE_PATH (Tag: $SOURCE_TAG)"
 
     if [ -d "$SOURCE_PATH" ]; then
+        
+        # Temp file for JSON output
+        JSON_OUT="/tmp/restic_out_${SOURCE_TAG//[^a-zA-Z0-9]/_}.json"
+        
         if [ "$DRY_RUN" = true ]; then
              log "[DRY-RUN] Would backup $SOURCE_PATH with tag $SOURCE_TAG..."
-             restic backup "$SOURCE_PATH" --host "$(hostname)" --tag "$SOURCE_TAG" --dry-run
+             restic backup "$SOURCE_PATH" --host "$(hostname)" --tag "$SOURCE_TAG" --dry-run --json > "$JSON_OUT"
         else
             restic backup "$SOURCE_PATH" \
                 --host "$(hostname)" \
-                --tag "$SOURCE_TAG"
+                --tag "$SOURCE_TAG" \
+                --json > "$JSON_OUT"
+        fi
+        
+        EXIT_CODE=$?
 
-            if [ $? -ne 0 ]; then
-                 log "!!! Backup failed for $SOURCE_TAG"
-                 BACKUP_HAS_ERRORS=true
+        # Parse JSON output (last line contains summary)
+        if [ -s "$JSON_OUT" ]; then
+            # Extract summary object from the last line (using tail -n1 because restic streams progress)
+            SUMMARY=$(tail -n1 "$JSON_OUT") 
+            
+            # Check if it's valid JSON
+            if echo "$SUMMARY" | jq -e . >/dev/null 2>&1; then
+                # Extract Stats
+                FILES_NEW=$(echo "$SUMMARY" | jq '.files_new // 0')
+                FILES_CHANGED=$(echo "$SUMMARY" | jq '.files_changed // 0')
+                BYTES=$(echo "$SUMMARY" | jq '.total_bytes_processed // 0')
+                DURATION=$(echo "$SUMMARY" | jq '.total_duration // 0')
+                
+                # Accumulate
+                TOTAL_FILES_NEW=$((TOTAL_FILES_NEW + FILES_NEW))
+                TOTAL_FILES_CHANGED=$((TOTAL_FILES_CHANGED + FILES_CHANGED))
+                TOTAL_BYTES=$((TOTAL_BYTES + BYTES))
+                TOTAL_DURATION=$(echo "$TOTAL_DURATION + $DURATION" | bc 2>/dev/null || echo "$TOTAL_DURATION") # float math via bc needed? restic gives seconds
+                
+                log "    Stats: New: $FILES_NEW, Changed: $FILES_CHANGED, Bytes: $(numfmt --to=iec-i --suffix=B $BYTES)"
             else
-                 log ">>> Backup successful for $SOURCE_TAG"
+                 # Fallback if JSON is weird (e.g. fatal error immediately, output isn't JSON)
+                 log "    Warning: Could not parse Restic JSON output."
             fi
+            
+            # Cleanup
+            rm -f "$JSON_OUT"
+        fi
+
+        if [ $EXIT_CODE -ne 0 ]; then
+             log "!!! Backup failed for $SOURCE_TAG"
+             BACKUP_HAS_ERRORS=true
+        else
+             log ">>> Backup successful for $SOURCE_TAG"
         fi
     else
         log ">>> ERROR: Path $SOURCE_PATH does not exist!"
@@ -188,5 +228,12 @@ if [ "$BACKUP_HAS_ERRORS" = true ]; then
     log "Backup completed with errors."
     exit 1
 else
-    monitor_ping "success"
+    # Construct Payload
+    PAYLOAD=$(jq -n \
+                  --arg files_new "$TOTAL_FILES_NEW" \
+                  --arg files_changed "$TOTAL_FILES_CHANGED" \
+                  --arg bytes "$TOTAL_BYTES" \
+                  '{files_new: $files_new, files_changed: $files_changed, total_bytes: $bytes}')
+    
+    monitor_ping "success" "$PAYLOAD"
 fi
