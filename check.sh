@@ -21,3 +21,4 @@ check_dependencies
 
 restic check
 restic snapshots
+restic stats --mode raw-data
