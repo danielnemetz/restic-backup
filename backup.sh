@@ -198,12 +198,28 @@ if [ "$DRY_RUN" = true ]; then
     log "[DRY-RUN] Simulating retention policy..."
 fi
 
+# Build optional --keep-tag arguments from RETENTION_KEEP_TAGS (comma-separated)
+KEEP_TAG_ARGS=()
+if [ -n "${RETENTION_KEEP_TAGS:-}" ]; then
+    IFS=',' read -ra _TAGS <<< "${RETENTION_KEEP_TAGS}"
+    for _TAG in "${_TAGS[@]}"; do
+        # Trim whitespace
+        _TAG="${_TAG#"${_TAG%%[![:space:]]*}"}"
+        _TAG="${_TAG%"${_TAG##*[![:space:]]}"}" 
+        if [ -n "$_TAG" ]; then
+            KEEP_TAG_ARGS+=("--keep-tag" "$_TAG")
+            log "  Keeping all snapshots with tag: $_TAG"
+        fi
+    done
+fi
+
 restic forget \
     --keep-last "${RETENTION_LAST}" \
     --keep-daily "${RETENTION_DAILY}" \
     --keep-weekly "${RETENTION_WEEKLY}" \
     --keep-monthly "${RETENTION_MONTHLY}" \
     --keep-yearly "${RETENTION_YEARLY}" \
+    "${KEEP_TAG_ARGS[@]}" \
     --prune $RESTIC_DRY_RUN_ARG
 
 # --- Step 4: Verification ---
