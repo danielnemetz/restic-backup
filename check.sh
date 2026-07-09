@@ -19,6 +19,6 @@ fi
 
 check_dependencies
 
-restic check
-restic snapshots
-restic stats --mode raw-data
+restic_cmd check
+restic_cmd snapshots
+restic_cmd stats --mode raw-data

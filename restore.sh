@@ -25,7 +25,7 @@ echo "------------------------------------------------------------"
 
 # We get the snapshots in a format: ID  Date  Hostname  Tags  Paths
 # Using 'mapfile' to read the list of snapshots into an array
-mapfile -t SNAPSHOTS < <(restic snapshots --no-lock | grep -E '^[0-9a-f]{8}')
+mapfile -t SNAPSHOTS < <(restic_cmd snapshots --no-lock | grep -E '^[0-9a-f]{8}')
 
 if [ ${#SNAPSHOTS[@]} -eq 0 ]; then
     echo "No snapshots found in repository."
@@ -83,7 +83,7 @@ fi
 
 # --- Step 3: Run Restic Restore ---
 echo "Restoring data... this may take a while."
-restic restore "$SELECTED_SNAPSHOT_ID" --target "$FINAL_RESTORE_DIR"
+restic_cmd restore "$SELECTED_SNAPSHOT_ID" --target "$FINAL_RESTORE_DIR"
 
 echo "----------------------------------------------------------"
 echo "SUCCESS: Data restored to:"

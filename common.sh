@@ -30,6 +30,18 @@ export RESTIC_REPOSITORY
 export RESTIC_PASSWORD
 export RCLONE_CONFIG
 
+# Wrapper for restic with optional global flags from .env
+# RESTIC_LIMIT_UPLOAD: passed as --limit-upload (e.g. "5" for 5 MiB/s, "500k")
+restic_cmd() {
+    local restic_args=()
+
+    if [ -n "${RESTIC_LIMIT_UPLOAD:-}" ]; then
+        restic_args+=(--limit-upload "${RESTIC_LIMIT_UPLOAD}")
+    fi
+
+    command restic "${restic_args[@]}" "$@"
+}
+
 # 4. Logging Helper
 log() {
     local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"

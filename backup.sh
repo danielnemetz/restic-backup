@@ -102,12 +102,12 @@ run_hooks "pre"
 
 # --- Step 1: Ensure Repository exists ---
 log "Checking repository status..."
-if ! restic snapshots --no-lock > /dev/null 2>&1; then
+if ! restic_cmd snapshots --no-lock > /dev/null 2>&1; then
     if [ "$DRY_RUN" = true ]; then
         log "[DRY-RUN] Repository not found. Would initialize..."
     else
         log "Repository not found. Initializing..."
-        restic init
+        restic_cmd init
     fi
 fi
 
@@ -135,9 +135,9 @@ for target in $BACKUP_TARGETS; do
         
         if [ "$DRY_RUN" = true ]; then
              log "[DRY-RUN] Would backup $SOURCE_PATH with tag $SOURCE_TAG..."
-             restic backup "$SOURCE_PATH" --host "$(hostname)" --tag "$SOURCE_TAG" --dry-run --json > "$JSON_OUT"
+             restic_cmd backup "$SOURCE_PATH" --host "$(hostname)" --tag "$SOURCE_TAG" --dry-run --json > "$JSON_OUT"
         else
-            restic backup "$SOURCE_PATH" \
+            restic_cmd backup "$SOURCE_PATH" \
                 --host "$(hostname)" \
                 --tag "$SOURCE_TAG" \
                 --json > "$JSON_OUT"
@@ -213,7 +213,7 @@ if [ -n "${RETENTION_KEEP_TAGS:-}" ]; then
     done
 fi
 
-restic forget \
+restic_cmd forget \
     --keep-last "${RETENTION_LAST}" \
     --keep-daily "${RETENTION_DAILY}" \
     --keep-weekly "${RETENTION_WEEKLY}" \
@@ -227,11 +227,11 @@ if [ "$DRY_RUN" = true ]; then
     log "[DRY-RUN] Skipping strict verification (check)."
 else
     log "Verifying repository integrity..."
-    restic check
+    restic_cmd check
 fi
 
 log "Current snapshots in repository:"
-restic snapshots
+restic_cmd snapshots
 
 # --- Step 5: Run Post-Backup Hooks ---
 run_hooks "post"
